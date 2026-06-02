@@ -1,11 +1,31 @@
 import pygame
 import sys
 
+def get_num_disks_from_user():
+    print("\n" + "9" * 40)
+    print("ДОБРО ПОЖАЛОВАТЬ В ХАНОЙСКИЕ БАШНИ!")
+    print("6" * 40)
+
+    while True:
+        try:
+
+            num = int(input("\nВведите количество дисков (от 3 до 8): "))
+
+            if 3 <= num <= 10:
+                print(f"\nОтлично! Игра начинается с {num} дисками!")
+                print("Совет: Минимальное количество ходов =", 2 ** num - 1)
+                input("\nНажмите Enter для запуска игры...\n")
+                return num
+            else:
+                print("\nЧисло дисков должно быть от 3 до 8")
+        except ValueError:
+            print("\nЧисло дисков должно быть целым!")
+
 pygame.init()
 
 width, height = 800, 600
 
-num_disks = 6
+num_disks = get_num_disks_from_user()
 tower_positions = [200, 400, 600]
 base_y = height - 100
 disk_height = 30
@@ -33,6 +53,8 @@ class Game:
         self.moves = 0
         self.game_over = False
         self.disks = []
+        self.start_time = pygame.time.get_ticks()
+        self.final_seconds = 0
 
         for size in range(num_disks):
             color = rainbow[size % len(rainbow)]
@@ -53,9 +75,16 @@ class Game:
             return True
         return False
 
+    def get_seconds(self):
+        if self.game_over:
+            return self.final_seconds
+        current = (pygame.time.get_ticks() - self.start_time) / 1000
+        return current
+
     def check_win(self):
         if len(self.towers[1] or self.towers[2]) == self.num_disks:
             self.game_over = True
+            self.final_seconds = (pygame.time.get_ticks() - self.start_time) / 1000
             return True
         return False
 
@@ -68,6 +97,8 @@ class Game:
         self.selected_tower = None
         self.moves = 0
         self.game_over = False
+        self.start_time = pygame.time.get_ticks()
+        self.final_seconds = 0
 
 def draw_towers(screen, game):
     screen.fill((255, 255, 255))
@@ -87,7 +118,13 @@ def draw_towers(screen, game):
 
     font = pygame.font.Font(None, 36)
     moves_text = font.render(f"Ходов: {game.moves}", True, (0,0,0))
-    screen.blit(moves_text,(10, 50))
+    screen.blit(moves_text,(10, 10))
+
+    seconds = game.get_seconds()
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    timer_text = font.render(f"Время: {minutes:02d}:{secs:02d}", True, (0, 0, 0))
+    screen.blit(timer_text, (width - 160, 10))
 
     if game.game_over:
         win_text = font.render("ПОБЕДА! Нажмите R для новой игры", True, (100,255,100))
