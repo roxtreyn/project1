@@ -1,0 +1,194 @@
+import pygame
+import sys
+
+def get_num_disks_from_user():
+    print("\n" + "9" * 40)
+    print("ДОБРО ПОЖАЛОВАТЬ В ХАНОЙСКИЕ БАШНИ!")
+    print("6" * 40)
+
+    while True:
+        try:
+
+            num = int(input("\nВведите количество дисков (от 3 до 8): "))
+
+            if 3 <= num <= 10:
+                print(f"\nОтлично! Игра начинается с {num} дисками!")
+                print("Совет: Минимальное количество ходов =", 2 ** num - 1)
+                input("\nНажмите Enter для запуска игры...\n")
+                return num
+            else:
+                print("\nЧисло дисков должно быть от 3 до 8")
+        except ValueError:
+            print("\nЧисло дисков должно быть целым!")
+
+pygame.init()
+
+width, height = 800, 600
+
+num_disks = get_num_disks_from_user()
+tower_positions = [200, 400, 600]
+base_y = height - 100
+disk_height = 30
+min_disk_width = 40
+max_disk_width = 180
+disk_width_step = (max_disk_width - min_disk_width) // (num_disks - 1) if num_disks > 1 else 0
+rainbow = [(255,0,0), (255,127,0), (255,255,0), (0,255,0), (0,0,255), (75,0,130), (238,130,238)]
+
+
+class Disk:
+    def __init__(self, size, color):
+        self.size = size
+        self.color = color
+        self.width = min_disk_width + size * disk_width_step
+
+class Game:
+    def __init__(self, num_disks1):
+        self.num_disks = num_disks1
+        self.towers = [
+            list(range(num_disks1 - 1, -1, -1)),
+            [],
+            []
+        ]
+        self.selected_tower = None
+        self.moves = 0
+        self.game_over = False
+        self.disks = []
+        self.start_time = pygame.time.get_ticks()
+        self.final_seconds = 0
+
+        for size in range(num_disks):
+            color = rainbow[size % len(rainbow)]
+            self.disks.append(Disk(size, color))
+
+    def can_move(self,from_tower, to_tower):
+        if not self.towers[from_tower]:
+            return False
+        if not self.towers[to_tower]:
+            return True
+        return self.towers[from_tower][-1] < self.towers[to_tower][-1]
+
+    def move(self,from_tower, to_tower):
+        if self.can_move(from_tower, to_tower):
+            disk = self.towers[from_tower].pop()
+            self.towers[to_tower].append(disk)
+            self.moves += 1
+            return True
+        return False
+
+    def get_seconds(self):
+        if self.game_over:
+            return self.final_seconds
+        current = (pygame.time.get_ticks() - self.start_time) / 1000
+        return current
+
+    def check_win(self):
+        if len(self.towers[1] or self.towers[2]) == self.num_disks:
+            self.game_over = True
+            self.final_seconds = (pygame.time.get_ticks() - self.start_time) / 1000
+            return True
+        return False
+
+    def reset(self):
+        self.towers = [
+            list(range(num_disks - 1, -1, -1)),
+            [],
+            []
+        ]
+        self.selected_tower = None
+        self.moves = 0
+        self.game_over = False
+        self.start_time = pygame.time.get_ticks()
+        self.final_seconds = 0
+
+def draw_towers(screen, game):
+    screen.fill((255, 255, 255))
+    for i, x in enumerate(tower_positions):
+        pygame.draw.rect(screen,(100,100,100), (x - 70, base_y,140, 15))
+        pygame.draw.rect(screen,(200,200,200),(x - 5, base_y - 300, 10, 300))
+        if game.selected_tower == i:
+            pygame.draw.rect(screen,(100,100,255),(x - 6, base_y - 300, 13, 300),3)
+
+    for tower_idx, tower_dicks in enumerate(game.towers):
+        for level, disk_size in enumerate(tower_dicks):
+            disk = game.disks[disk_size]
+            x = tower_positions[tower_idx] - disk.width // 2
+            y = base_y - (level + 1) * disk_height
+            pygame.draw.rect(screen, disk.color, (x, y, disk.width, 30))
+            pygame.draw.rect(screen,(0,0,0),(x,y,disk.width,30),2)
+
+    font = pygame.font.Font(None, 36)
+    moves_text = font.render(f"Ходов: {game.moves}", True, (0,0,0))
+    screen.blit(moves_text,(10, 10))
+
+    seconds = game.get_seconds()
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    timer_text = font.render(f"Время: {minutes:02d}:{secs:02d}", True, (0, 0, 0))
+    screen.blit(timer_text, (width - 160, 10))
+
+    if game.game_over:
+        win_text = font.render("ПОБЕДА! Нажмите R для новой игры", True, (100,255,100))
+        text_rect = win_text.get_rect(center=(width // 2, height // 2))
+        screen.blit(win_text, text_rect)
+
+    small_font = pygame.font.Font(None, 24)
+    controls_text = small_font.render(
+        "Кликните на башню для выбора, затем на другую башню для перемещения | R: Новая игра", True, (0,0,0))
+    screen.blit(controls_text, (10, height - 30))
+
+def get_tower_under_mouse(pos):
+    x = pos[0]
+    y = pos[1]
+
+    if 130 < x < 270 and 180 < y < 520:
+        return 0
+    if 330 < x < 470 and 180 < y < 520:
+        return 1
+    if 530 < x < 670 and 180 < y < 520:
+        return 2
+
+    return None
+
+def main():
+    screen = pygame.display.set_mode((width, height))
+    pygame.display.set_caption("Ханойские башни")
+    clock = pygame.time.Clock()
+
+    game = Game(num_disks)
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if game.game_over:
+                    continue
+
+                tower = get_tower_under_mouse(event.pos)
+                if tower is not None:
+                    if game.selected_tower is None:
+                        # Выбираем башню, если на ней есть диски
+                        if game.towers[tower]:
+                            game.selected_tower = tower
+                    else:
+                        # Пытаемся переместить диск
+                        if game.move(game.selected_tower, tower):
+                            game.check_win()
+                        game.selected_tower = None
+
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:
+                    game.reset()
+
+        draw_towers(screen, game)
+        pygame.display.flip()
+        clock.tick(60)
+
+    pygame.quit()
+    sys.exit()
+
+
+if __name__ == "__main__":
+    main()
